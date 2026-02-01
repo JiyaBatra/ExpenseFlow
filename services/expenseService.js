@@ -5,6 +5,7 @@ const User = require('../models/User');
 const currencyService = require('./currencyService');
 const budgetService = require('./budgetService');
 const approvalService = require('./approvalService');
+const intelligenceService = require('./intelligenceService');
 
 class ExpenseService {
     async createExpense(rawData, userId, io) {

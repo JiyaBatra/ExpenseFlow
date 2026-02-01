@@ -1,3 +1,5 @@
+// ...existing code...
+// ...existing code...
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
@@ -168,6 +170,14 @@ const userSchema = new mongoose.Schema({
     }
   },
 
+
+  // Security fields for account lockout and password management
+  security: {
+    failedLoginAttempts: { type: Number, default: 0 },
+    lockoutUntil: { type: Number, default: null },
+    passwordChangedAt: { type: Date }
+  },
+
   // Financial Profile for calculations
   financialProfile: {
     monthlyIncome: {
@@ -190,10 +200,76 @@ const userSchema = new mongoose.Schema({
       default: 0,
       min: 0
     }
+  },
+  
+  // ========================
+  // Intelligence Preferences (Issue #470)
+  // ========================
+  intelligencePreferences: {
+    enablePredictiveAnalysis: {
+      type: Boolean,
+      default: true
+    },
+    emailAlerts: {
+      type: Boolean,
+      default: true
+    },
+    alertThresholds: {
+      burnRateIncrease: {
+        type: Number,
+        default: 20, // Percentage
+        min: 0,
+        max: 100
+      },
+      budgetExhaustionDays: {
+        type: Number,
+        default: 7, // Days until exhaustion to trigger alert
+        min: 1,
+        max: 30
+      }
+    },
+    forecastPeriod: {
+      type: Number,
+      default: 30, // Days to forecast
+      min: 7,
+      max: 90
+    },
+    analysisFrequency: {
+      type: String,
+      enum: ['daily', 'weekly', 'monthly'],
+      default: 'daily'
+    },
+    cacheForecasts: {
+      type: Boolean,
+      default: true
+    },
+    lastAnalysisRun: {
+      type: Date
+    }
   }
 }, {
   timestamps: true
 });
+// ...existing code...
+// Account lockout check method
+userSchema.methods.isLocked = function() {
+  if (this.security && this.security.lockoutUntil) {
+    return this.security.lockoutUntil > Date.now();
+  }
+  return false;
+};
+
+// Record login method for audit and lockout reset
+userSchema.methods.recordLogin = async function(ip) {
+  // Reset failed login attempts and lockout
+  if (this.security) {
+    this.security.failedLoginAttempts = 0;
+    this.security.lockoutUntil = null;
+  }
+  this.lastLogin = new Date();
+  // Optionally store IP if desired: this.lastLoginIp = ip;
+  await this.save();
+};
 
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
