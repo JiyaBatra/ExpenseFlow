@@ -256,9 +256,8 @@ app.use('/api/tags', require('./routes/tags'));
 app.use('/api/2fa', require('./middleware/auth'), twoFactorAuthRoutes);
 app.use('/api/receipts', require('./routes/receipts'));
 app.use('/api/folders', require('./routes/folders'));
-app.use('/api/debt', require('./routes/debt'));
-app.use('/api/forecast', require('./routes/forecast'));
-app.use('/api/budgets', require('./routes/budgets'));
+app.use('/api/approvals', require('./routes/approvals'));
+app.use('/api/teams', require('./routes/teams'));
 
 // Import error handling middleware
 const { errorHandler, notFoundHandler } = require('./middleware/errorMiddleware');

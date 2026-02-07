@@ -493,29 +493,65 @@ class TransactionsManager {
         };
 
         try {
-            if (this.editingTransaction) {
-                // Update existing transaction
-                const index = this.transactions.findIndex(t => t.id === this.editingTransaction.id);
-                if (index !== -1) {
-                    this.transactions[index] = { ...this.editingTransaction, ...formData };
-                }
-                this.showNotification('Transaction updated successfully!', 'success');
-            } else {
-                // Add new transaction
-                const newTransaction = {
-                    id: `txn_${Date.now()}`,
-                    ...formData,
-                    merchant: 'Manual Entry',
-                    createdAt: new Date().toISOString()
-                };
-                this.transactions.unshift(newTransaction);
-                this.showNotification('Transaction added successfully!', 'success');
-            }
+            const response = await fetch('/api/expenses', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify(formData)
+            });
 
-            this.applyFilters();
-            this.closeModal();
+            if (response.ok) {
+                this.showNotification('Transaction saved as draft!', 'success');
+                this.loadTransactions();
+                this.closeModal();
+            } else {
+                throw new Error('Failed to save');
+            }
         } catch (error) {
             this.showNotification('Error saving transaction', 'error');
+        }
+    }
+
+    async submitForApproval() {
+        // First save the transaction, then submit
+        const formData = {
+            type: document.getElementById('transactionType').value,
+            amount: parseFloat(document.getElementById('transactionAmount').value),
+            description: document.getElementById('transactionDescription').value,
+            category: document.getElementById('transactionCategory').value,
+            date: document.getElementById('transactionDate').value,
+            notes: document.getElementById('transactionNotes').value,
+            approvalStatus: 'pending'
+        };
+
+        try {
+            const saveRes = await fetch('/api/expenses', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const data = await saveRes.json();
+            if (data.success) {
+                // Now trigger approval submission
+                const submitRes = await fetch(`/api/approvals/submit/${data.data._id}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+
+                if (submitRes.ok) {
+                    this.showNotification('Transaction submitted for approval!', 'success');
+                    this.loadTransactions();
+                    this.closeModal();
+                }
+            }
+        } catch (error) {
+            this.showNotification('Error during submission', 'error');
         }
     }
 
