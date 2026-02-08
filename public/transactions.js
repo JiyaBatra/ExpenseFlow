@@ -17,8 +17,25 @@ class TransactionsManager {
 
     init() {
         this.loadTransactions();
+        this.loadProjectsForDropdown();
         this.bindEvents();
         this.setDefaultDate();
+    }
+
+    async loadProjectsForDropdown() {
+        try {
+            const res = await fetch('/api/project-billing/projects', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            const { data } = await res.json();
+            const select = document.getElementById('transactionProject');
+            if (select && data.projects) {
+                select.innerHTML = '<option value="">No Project</option>' +
+                    data.projects.map(p => `<option value="${p._id}">${p.name}</option>`).join('');
+            }
+        } catch (err) {
+            console.error('Failed to load projects for dropdown');
+        }
     }
 
     // Mock data generation
@@ -483,9 +500,11 @@ class TransactionsManager {
             description: document.getElementById('transactionDescription').value,
             category: document.getElementById('transactionCategory').value,
             date: document.getElementById('transactionDate').value,
-            merchant: document.getElementById('transactionMerchant').value,
-            tags: document.getElementById('transactionTags').value.split(',').map(t => t.trim()).filter(t => t),
-            notes: document.getElementById('transactionNotes').value
+            notes: document.getElementById('transactionNotes').value,
+            projectId: document.getElementById('transactionProject').value || null,
+            billing: {
+                isBillable: document.getElementById('transactionBillable').checked
+            }
         };
 
         try {
