@@ -125,10 +125,10 @@ transactionSchema.pre('save', function (next) {
 });
 
 // Indexes for performance optimization
+transactionSchema.index({ description: 'text', merchant: 'text' }); // Text search
 transactionSchema.index({ user: 1, date: -1 });
 transactionSchema.index({ workspace: 1, date: -1 });
-transactionSchema.index({ user: 1, type: 1, date: -1 });
-transactionSchema.index({ workspace: 1, type: 1, date: -1 });
+transactionSchema.index({ user: 1, amount: 1 }); // Range queries optimization
 transactionSchema.index({ user: 1, category: 1, date: -1 });
 transactionSchema.index({ workspace: 1, category: 1, date: -1 });
 transactionSchema.index({ receiptId: 1 });
