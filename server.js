@@ -28,6 +28,9 @@ require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const expenseRoutes = require('./routes/expenses');
+const expenseCreationRoutes = require('./routes/expenseCreation');
+const expenseUpdateRoutes = require('./routes/expenseUpdate');
+const expenseExportRoutes = require('./routes/expenseExport');
 const syncRoutes = require('./routes/sync');
 const splitsRoutes = require('./routes/splits');
 const groupsRoutes = require('./routes/groups');
