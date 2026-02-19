@@ -70,6 +70,8 @@ async function connectDatabase() {
         require('./jobs/reportScheduler').start();
         require('./jobs/accessAuditor').start();
         require('./jobs/forecastRetrainer').start();
+        require('./jobs/taxonomyAuditor').start();
+        require('./jobs/conflictCleaner').start();
 
 
         console.log('✓ Cron jobs initialized');
