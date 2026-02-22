@@ -79,6 +79,8 @@ async function connectDatabase() {
         require('./jobs/conflictCleaner').start();
         require('./jobs/logRotator').start();
         require('./jobs/searchIndexer').start();
+        require('./jobs/conflictPruner').start();
+
 
 
         // Start resilient orchestrator
@@ -112,7 +114,8 @@ app.use('/api/export', require('./routes/export'));
 app.use('/api/forecasting', require('./routes/forecasting'));
 app.use('/api/governance', require('./routes/governance'));
 app.use('/api/taxonomy', require('./routes/taxonomy'));
-app.use('/api/sync', require('./routes/syncManager'));
+app.use('/api/sync', require('./routes/sync'));
+
 app.use('/api/telemetry', require('./routes/telemetry'));
 app.use('/api/jobs', require('./routes/jobs'));
 
