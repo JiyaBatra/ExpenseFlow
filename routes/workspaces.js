@@ -100,6 +100,25 @@ router.get('/:id/consolidated-report', auth, workspaceAccess('reports:view'), as
 });
 
 /**
+ * Relocate resource between workspaces
+ * POST /api/workspaces/:id/relocate-resource
+ */
+router.post('/:id/relocate-resource', auth, workspaceAccess('workspace:settings'), async (req, res) => {
+  try {
+    const { resourceId, targetWorkspaceId } = req.body;
+    const result = await workspaceService.relocateTransaction(
+      req.user._id,
+      resourceId,
+      req.params.id,
+      targetWorkspaceId
+    );
+    res.json({ success: true, data: result, message: 'Resource relocated successfully' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+/**
  * Get user's workspaces
  * GET /api/workspaces
  */

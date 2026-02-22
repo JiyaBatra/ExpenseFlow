@@ -52,6 +52,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(require('./middleware/encryptionInterceptor'));
 app.use(require('./middleware/validationInterceptor'));
 app.use(require('./middleware/auditInterceptor'));
+app.use(require('./middleware/tenantResolver'));
+app.use(require('./middleware/leakageGuard'));
 
 
 
@@ -117,6 +119,7 @@ app.use('/api/forecasting', require('./routes/forecasting'));
 app.use('/api/governance', require('./routes/governance'));
 app.use('/api/taxonomy', require('./routes/taxonomy'));
 app.use('/api/sync', require('./routes/sync'));
+app.use('/api/admin', require('./routes/admin'));
 
 app.use('/api/telemetry', require('./routes/telemetry'));
 app.use('/api/jobs', require('./routes/jobs'));

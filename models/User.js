@@ -69,11 +69,11 @@ const userSchema = new mongoose.Schema({
     trim: true,
     maxlength: 50
   },
-  clerkId:{
-    type:String,
-    unique:true,
-    required:true,
-    index:true
+  clerkId: {
+    type: String,
+    unique: true,
+    required: true,
+    index: true
   },
   email: {
     type: String,
@@ -82,50 +82,55 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     trim: true
   },
-  firstName:{
-    type:String,
-    trim:true
+  firstName: {
+    type: String,
+    trim: true
   },
-  lastName:{
-    type:String,
-    trim:true
+  lastName: {
+    type: String,
+    trim: true
   },
-  profileImage:{
-    type:String,
-    default:null
+  profileImage: {
+    type: String,
+    default: null
   },
-  phone:{
-    type:String,
-    trim:true,
-    default:null
+  phone: {
+    type: String,
+    trim: true,
+    default: null
   },
-  bio:{
-    type:String,
-    trim:true,
-    maxlength:500,
-    default:null
+  bio: {
+    type: String,
+    trim: true,
+    maxlength: 500,
+    default: null
   },
-  role:{
-    type:String,
-    enum:["user","admin"],
-    default:"user"
+  role: {
+    type: String,
+    enum: ['user', 'admin', 'submitter', 'approver', 'finance'],
+    default: 'user'
   },
+  workspaces: [{
+    workspace: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace' },
+    role: { type: String, enum: ['owner', 'manager', 'editor', 'viewer'], default: 'viewer' },
+    joinedAt: { type: Date, default: Date.now }
+  }],
 
   password: {
     type: String,
     required: true,
     minlength: 12
   },
-    // CLERK METADATA - ADD THIS
+  // CLERK METADATA - ADD THIS
   clerkMetadata: {
     type: Object,
     default: {}
   },
-  lastLoginAt:{
+  lastLoginAt: {
     type: Date,
     default: Date.now
   },
-  isActive:{
+  isActive: {
     type: Boolean,
     default: true
   },
@@ -142,11 +147,6 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0,
     min: 0
-  },
-  role: {
-    type: String,
-    enum: ['submitter', 'approver', 'finance', 'admin'],
-    default: 'submitter'
   },
 
   // ========================
@@ -309,12 +309,12 @@ userSchema.index({ clerkId: 1 });
 userSchema.index({ email: 1 });
 
 // Virtual for full name
-userSchema.virtual('fullName').get(function() {
+userSchema.virtual('fullName').get(function () {
   return `${this.firstName || ''} ${this.lastName || ''}`.trim();
 });
 
 // Method to sync from Clerk
-userSchema.methods.syncFromClerk = async function(clerkUser) {
+userSchema.methods.syncFromClerk = async function (clerkUser) {
   this.email = clerkUser.emailAddresses[0]?.emailAddress || this.email;
   this.firstName = clerkUser.firstName || this.firstName;
   this.lastName = clerkUser.lastName || this.lastName;

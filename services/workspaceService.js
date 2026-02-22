@@ -381,6 +381,45 @@ class WorkspaceService {
         await expense.save();
         return expense;
     }
+
+    /**
+     * Relocate Transaction (Cross-Workspace Move)
+     * Issue #729: Securely moves a transaction between workspaces while validating tenant boundaries.
+     */
+    async relocateTransaction(userId, transactionId, sourceWorkspaceId, targetWorkspaceId) {
+        const Transaction = mongoose.model('Transaction');
+        const queryScoper = require('../utils/queryScoper');
+
+        // 1. Validate ownership and existence in source
+        const transaction = await queryScoper.validateOwnership(Transaction, transactionId, sourceWorkspaceId);
+
+        // 2. Validate target workspace access
+        const targetWorkspace = await Workspace.findById(targetWorkspaceId);
+        if (!targetWorkspace) throw new Error('Target workspace not found');
+
+        const hasAccess = await this.checkHierarchicalPermission(userId, targetWorkspaceId, 'workspace:settings');
+        if (!hasAccess && targetWorkspace.owner.toString() !== userId.toString()) {
+            throw new Error('No permission to move resources into the target workspace');
+        }
+
+        // 3. Perform move
+        transaction.workspace = targetWorkspaceId;
+        transaction.syncMetadata = transaction.syncMetadata || {};
+        transaction.syncMetadata.lastModifiedByDevice = 'SYSTEM_RELOCATE';
+
+        await transaction.save();
+
+        // 4. Log the move for forensic audit
+        if (typeof targetWorkspace.logActivity === 'function') {
+            targetWorkspace.logActivity('resource:relocated', userId, {
+                resourceId: transactionId,
+                from: sourceWorkspaceId
+            });
+            await targetWorkspace.save();
+        }
+
+        return transaction;
+    }
 }
 
 module.exports = new WorkspaceService();

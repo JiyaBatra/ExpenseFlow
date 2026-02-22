@@ -7,6 +7,7 @@ const AuditLog = require('../models/AuditLog');
 const emailService = require('../services/emailService');
 const securityMonitor = require('../services/securityMonitor');
 const SecurityService = require('../services/securityService');
+const authService = require('../services/authService');
 const DeviceFingerprint = require('../models/DeviceFingerprint');
 const { captureDeviceFingerprint, generateFingerprint } = require('../middleware/deviceFingerprint');
 const auth = require('../middleware/auth');
@@ -41,16 +42,11 @@ router.post('/register', registerLimiter, validateRequest(AuthSchemas.register),
   const user = new User(req.body);
   await user.save();
 
-  // Generate JWT with unique ID for session tracking
-  const jwtId = crypto.randomBytes(16).toString('hex');
-  const token = jwt.sign(
-    { id: user._id, jti: jwtId },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRE || '24h' }
-  );
+  // Use centralized AuthService
+  const { token, jwtId } = authService.generateToken(user);
 
   // Create session
-  await Session.createSession(user._id, jwtId, req, {
+  await authService.createSession(user, jwtId, req, {
     loginMethod: 'password',
     rememberMe: false
   });
