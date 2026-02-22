@@ -51,6 +51,8 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(require('./middleware/encryptionInterceptor'));
 app.use(require('./middleware/validationInterceptor'));
+app.use(require('./middleware/auditInterceptor'));
+
 
 
 /* ================================
