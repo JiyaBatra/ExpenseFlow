@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const ValidationLog = require('../models/ValidationLog');
+const PolicyNode = require('../models/PolicyNode');
+const policyResolver = require('../services/policyResolver');
 
 /**
  * Data Governance Routes
@@ -47,6 +49,36 @@ router.get('/remediations', auth, async (req, res) => {
             .limit(20);
 
         res.json({ success: true, data: logs });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+/**
+ * @route   GET /api/governance/effective-policy/:workspaceId
+ * @desc    Get the fully resolved hierarchical policy for a workspace
+ */
+router.get('/effective-policy/:workspaceId', auth, async (req, res) => {
+    try {
+        const policy = await policyResolver.resolveEffectivePolicy(req.params.workspaceId, req.headers['x-tenant-id']);
+        res.json({ success: true, data: policy });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+/**
+ * @route   POST /api/governance/policies
+ * @desc    Create or update a policy node
+ */
+router.post('/policies', auth, async (req, res) => {
+    try {
+        const node = await PolicyNode.findOneAndUpdate(
+            { level: req.body.level, targetId: req.body.targetId },
+            req.body,
+            { upsert: true, new: true }
+        );
+        res.json({ success: true, data: node });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }

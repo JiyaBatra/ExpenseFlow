@@ -55,6 +55,7 @@ app.use(require('./middleware/auditInterceptor'));
 app.use(require('./middleware/tenantResolver'));
 app.use(require('./middleware/leakageGuard'));
 app.use(require('./middleware/liquidityGuard'));
+app.use(require('./middleware/governanceGuard'));
 
 
 
@@ -86,6 +87,7 @@ async function connectDatabase() {
         require('./jobs/searchIndexer').start();
         require('./jobs/conflictPruner').start();
         require('./jobs/liquidityAnalyzer').start();
+        require('./jobs/policyAuditor').start();
 
 
 
