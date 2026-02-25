@@ -16,7 +16,8 @@ class AuthService {
         const payload = {
             id: user._id,
             jti: jwtId,
-            role: user.role
+            role: user.role,
+            vaultAccess: true // Issue #770: Decryption permissions
         };
 
         // If a specific workspace is selected, embed it in the token

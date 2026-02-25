@@ -62,13 +62,15 @@ const transactionSchema = new mongoose.Schema({
         type: String,
         trim: true,
         maxlength: 50,
-        default: ''
+        default: '',
+        sensitive: true // Issue #770
     },
     notes: {
         type: String,
         trim: true,
         maxlength: 500,
-        default: ''
+        default: '',
+        sensitive: true // Issue #770
     },
     date: {
         type: Date,

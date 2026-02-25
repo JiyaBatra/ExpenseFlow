@@ -8,7 +8,7 @@ class BaseRepository {
     }
 
     /**
-     * Find all documents with optional filters, sorting, and pagination
+     * Find all documents (with vault decryption)
      */
     async findAll(filters = {}, options = {}) {
         const {
@@ -27,11 +27,12 @@ class BaseRepository {
         if (skip) query = query.skip(skip);
         if (limit) query = query.limit(limit);
 
-        return await query.exec();
+        const documents = await query.exec();
+        return await Promise.all(documents.map(doc => this._decryptSensitiveFields(doc)));
     }
 
     /**
-     * Find one document by filters
+     * Find one document (with vault decryption)
      */
     async findOne(filters, options = {}) {
         const { select = null, populate = null } = options;
@@ -41,11 +42,12 @@ class BaseRepository {
         if (select) query = query.select(select);
         if (populate) query = query.populate(populate);
 
-        return await query.exec();
+        const document = await query.exec();
+        return await this._decryptSensitiveFields(document);
     }
 
     /**
-     * Find by ID
+     * Find by ID (with vault decryption)
      */
     async findById(id, options = {}) {
         const { select = null, populate = null } = options;
@@ -55,15 +57,67 @@ class BaseRepository {
         if (select) query = query.select(select);
         if (populate) query = query.populate(populate);
 
-        return await query.exec();
+        const document = await query.exec();
+        return await this._decryptSensitiveFields(document);
     }
 
     /**
-     * Create a new document
+     * Create a new document (with vault encryption interception)
      */
     async create(data) {
-        const document = new this.model(data);
-        return await document.save();
+        let processedData = await this._encryptSensitiveFields(data);
+        const document = new this.model(processedData);
+        let saved = await document.save();
+        return await this._decryptSensitiveFields(saved);
+    }
+
+    /**
+     * Helper: Encrypt @sensitive fields before DB write
+     */
+    async _encryptSensitiveFields(data) {
+        if (!data || typeof data !== 'object') return data;
+
+        let processed = { ...data };
+        const cryptVault = require('../services/cryptVault');
+
+        for (const [key, path] of Object.entries(this.model.schema.paths)) {
+            if (path.options?.sensitive && data[key]) {
+                const tenantId = data.workspace || data.tenantId || 'global';
+                processed[key] = await cryptVault.encrypt(data[key], tenantId);
+            }
+        }
+        return processed;
+    }
+
+    /**
+     * Helper: Decrypt @sensitive fields post DB read
+     */
+    async _decryptSensitiveFields(doc) {
+        if (!doc) return doc;
+
+        let isMongooseDoc = typeof doc.toObject === 'function';
+        let processed = isMongooseDoc ? doc.toObject() : { ...doc };
+        const cryptVault = require('../services/cryptVault');
+
+        for (const [key, path] of Object.entries(this.model.schema.paths)) {
+            if (path.options?.sensitive && processed[key] && processed[key].startsWith('vault:')) {
+                const tenantId = processed.workspace || processed.tenantId || 'global';
+                processed[key] = await cryptVault.decrypt(processed[key], tenantId);
+            }
+        }
+
+        if (isMongooseDoc) {
+            // Overwrite original values to return a workable Mongoose doc if needed,
+            // though normally returning the lean object is preferred for DTOs.
+            for (const key of Object.keys(processed)) {
+                if (this.model.schema.paths[key]?.options?.sensitive) {
+                    doc[key] = processed[key];
+                }
+            }
+            return doc;
+        }
+
+        return processed;
     }
 
     /**
@@ -138,7 +192,7 @@ class BaseRepository {
     }
 
     /**
-     * Find with pagination
+     * Find with pagination (with vault decryption)
      */
     async findWithPagination(filters = {}, options = {}) {
         const {
@@ -157,7 +211,7 @@ class BaseRepository {
         ]);
 
         return {
-            documents,
+            documents, // Already decrypted by findAll
             pagination: {
                 page: parseInt(page),
                 limit: parseInt(limit),
