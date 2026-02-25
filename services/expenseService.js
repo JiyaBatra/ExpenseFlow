@@ -127,8 +127,29 @@ class ExpenseService {
             expense._id,
             'CREATED',
             finalData,
-            userId
+            userId,
+            finalData.workspace
         );
+
+        // Issue #768: Treasury Liquidity Settlement
+        if (finalData.workspace) {
+            const treasuryRepository = require('../repositories/treasuryRepository');
+            const operatingNode = await treasuryRepository.findNode(finalData.workspace, 'OPERATING');
+            if (operatingNode) {
+                // Link expense to the fund node
+                finalData.treasuryNodeId = operatingNode._id;
+                // Record fund reservation in ledger
+                await ledgerService.recordEvent(
+                    operatingNode._id,
+                    'FUNDS_RESERVED',
+                    { amount: finalData.amount, expenseId: expense._id },
+                    userId,
+                    finalData.workspace,
+                    event._id,
+                    'TREASURY_NODE'
+                );
+            }
+        }
 
         // Update sequence in main document
         await expenseRepository.updateById(expense._id, {

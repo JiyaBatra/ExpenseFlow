@@ -45,7 +45,7 @@ class LedgerService {
     /**
      * Record a new event into the ledger
      */
-    async recordEvent(entityId, eventType, payload, userId) {
+    async recordEvent(entityId, eventType, payload, userId, workspaceId = null, parentEventId = null, entityType = 'TRANSACTION') {
         // 1. Get the last event to chain the hash
         const lastEvent = await FinancialEvent.findOne({ entityId }).sort({ sequence: -1 });
 
@@ -58,14 +58,17 @@ class LedgerService {
 
         // 3. Create the event
         const event = await FinancialEvent.create({
-            entityId,
+            entityId: entityId || new require('mongoose').Types.ObjectId(), // Handle virtual entities
+            entityType,
             eventType,
             payload,
             sequence,
             prevHash,
             currentHash,
             signature,
-            performedBy: userId,
+            performedBy: userId || '507f1f77bcf86cd799439011', // System user fallback
+            workspaceId,
+            parentEventId,
             timestamp: new Date()
         });
 
