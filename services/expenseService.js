@@ -58,32 +58,25 @@ class ExpenseService {
             }
         }
 
-        // 4. Handle Governance Policies (Workspace only)
+        // 4. Handle Hierarchical Governance Policies (#757)
         if (finalData.workspace) {
-            const policies = await Policy.find({
-                workspaceId: finalData.workspace,
-                isActive: true,
-                deletedAt: null
-            }).sort({ priority: -1 });
+            const policyResolver = require('./policyResolver');
+            const riskScoring = require('../utils/riskScoring');
 
-            const transaction = {
-                amount: finalData.amount,
-                category: finalData.category,
-                resourceType: 'expense',
-                requesterRole: user.role,
-                department: modifiedData.department || 'default'
-            };
-
+            const effectiveRule = await policyResolver.getRuleForTransaction(finalData, finalData.workspace);
             let violations = [];
             let requiresApproval = false;
 
-            for (const policy of policies) {
-                if (policy.matchesTransaction(transaction)) {
+            if (effectiveRule) {
+                const risk = riskScoring.calculateScore(finalData, effectiveRule);
+                const severity = riskScoring.getSeverity(risk);
+
+                if (effectiveRule.action !== 'allow' || risk > 30) {
                     violations.push({
-                        policyId: policy._id,
-                        policyName: policy.name,
-                        riskScore: policy.riskScore,
-                        approvalChain: policy.getApprovalChain()
+                        policyLevel: effectiveRule.level,
+                        riskScore: risk,
+                        severity,
+                        category: effectiveRule.category
                     });
                     requiresApproval = true;
                 }
@@ -95,16 +88,12 @@ class ExpenseService {
                 finalData.policyFlags = violations;
                 finalData.fundHeld = true;
 
-                // Create approval chain from first policy
-                if (violations[0]) {
-                    const approvalChain = violations[0].approvalChain;
-                    finalData.approvals = approvalChain.map(stage => ({
-                        stage: stage.stage,
-                        approverId: stage.specificApprovers?.[0],
-                        approverRole: stage.approverRole,
-                        status: 'pending'
-                    })).filter(a => a.approverId);
-                }
+                // Hierarchical escalation
+                finalData.approvals = [{
+                    stage: 1,
+                    approverRole: violations[0].riskScore > 70 ? 'admin' : 'manager',
+                    status: 'pending'
+                }];
             }
         }
 

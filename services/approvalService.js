@@ -2,26 +2,35 @@ const Transaction = require('../models/Transaction');
 const ApprovalWorkflow = require('../models/ApprovalWorkflow');
 const Team = require('../models/Team');
 const User = require('../models/User');
+const policyResolver = require('./policyResolver');
+const riskScoring = require('../utils/riskScoring');
 
 class ApprovalService {
     /**
    * Check if a transaction requires approval
    */
     async requiresApproval(transactionData, workspaceId) {
-        // Logic: If amount > team/user limit, return true
+        // 1. Get Effective Policy Rule
+        const tenantId = transactionData.tenantId; // Assume passed or fetched
+        const rule = await policyResolver.getRuleForTransaction(transactionData, workspaceId, tenantId);
+
+        if (rule) {
+            // Calculate real-time risk score
+            const risk = riskScoring.calculateScore(transactionData, rule);
+            transactionData.riskScore = risk; // Inject for logging
+            transactionData.governanceSeverity = riskScoring.getSeverity(risk);
+
+            if (rule.action === 'block') return true;
+            if (rule.action === 'review') return true;
+            if (risk > 40) return true; // Auto-trigger for high risk
+        }
+
+        // 2. Legacy fallback
         const user = await User.findById(transactionData.user);
         const team = await Team.findOne({ 'members.user': user._id });
 
         if (team && transactionData.amount > team.approvalLimit) {
             return true;
-        }
-
-        const workflow = await this.getApplicableWorkflow(transactionData);
-        if (workflow && workflow.steps.length > 0) {
-            // Check if first step has an auto-approve threshold
-            if (workflow.steps[0].autoApproveUnder && transactionData.amount > workflow.steps[0].autoApproveUnder) {
-                return true;
-            }
         }
 
         return false;

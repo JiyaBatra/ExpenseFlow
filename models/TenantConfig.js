@@ -24,6 +24,11 @@ const tenantConfigSchema = new mongoose.Schema({
         type: Number,
         default: 3650 // 10 years by default
     },
+    // Issue #757: Tenant-level Policy Reference
+    policyNode: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'PolicyNode'
+    },
     ipWhitelist: [{
         type: String
     }],

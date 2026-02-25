@@ -149,6 +149,13 @@ const workspaceSchema = new mongoose.Schema({
     ref: 'Workspace',
     default: null
   },
+
+  // Issue #757: Hierarchical Policy Management
+  policyNode: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'PolicyNode',
+    default: null
+  },
   type: {
     type: String,
     enum: ['company', 'department', 'team', 'project', 'sandbox'],
