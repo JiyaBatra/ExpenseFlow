@@ -508,12 +508,50 @@ button {
 .hero-title {
   font-size: 3.5rem;
   font-weight: 700;
-  background: var(--primary-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  font-family: "Noto Sans", sans-serif;
   margin-bottom: 1rem;
-  animation: fadeInUp 1s ease-out;
+
+  /* Background Image */
+  background-image: url("your-image-path.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+
+  /* Text Clip Effect */
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+
+  /* Animation */
+  animation: animate 20s linear infinite;
+}
+@keyframes animate {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+.hero-title {
+  font-size: 3.5rem;
+  font-weight: 700;
+  font-family: "Noto Sans", sans-serif;
+  margin-bottom: 1rem;
+
+  background-image: url("client/assets/bg.jpeg");
+  background-size: 200% auto;
+  background-position: 0% 50%;
+  background-repeat: no-repeat;
+
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+
+  animation: animate 20s linear infinite;
 }
 
 .hero-subtitle {

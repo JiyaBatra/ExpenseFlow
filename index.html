@@ -34,11 +34,7 @@
 
   <!-- Main Content -->
   <main class="main-content">
-    <div class="hero-section glass">
-      <h1 class="hero-title">Smart Money Management</h1>
-      <p class="hero-subtitle">Take control of your finances with our intuitive expense tracker</p>
-    </div>
-
+    
 <div class="cursor-trail-container" id="cursor-trail"></div>
 
 <script>
@@ -287,7 +283,10 @@
       </div>
     </nav>
   </header>
-
+<div class="hero-section glass">
+      <h1 class="hero-title">Smart Money Management</h1>
+      <p class="hero-subtitle">Take control of your finances with our intuitive expense tracker</p>
+    </div>
       <!-- Transaction History -->
       <div class="history-section">
         <div class="section-header">
@@ -318,6 +317,7 @@
                 <option value="investment">📈 Investment</option>
                 <option value="other">📋 Other</option>
               </select>
+              
               <div class="date-filters">
                 <input type="date" id="date-from" class="date-input" placeholder="From">
                 <input type="date" id="date-to" class="date-input" placeholder="To">
@@ -332,7 +332,9 @@
             </div>
           </div>
         </div>
+        
         <ul id="list" class="list">
+        
           <!-- Transactions will be added here -->
         </ul>
       </div>
