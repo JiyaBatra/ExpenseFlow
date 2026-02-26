@@ -115,7 +115,8 @@ class TransactionService {
             transaction._id,
             'CREATED',
             finalData,
-            userId
+            userId,
+            finalData.workspace
         );
 
         transaction.ledgerSequence = event.sequence;
