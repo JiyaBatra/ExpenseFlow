@@ -105,6 +105,9 @@ async function connectDatabase() {
         require('./jobs/cachePruner').start();
         require('./jobs/velocityCalculator').start();
         require('./jobs/keyRotator').start();
+        
+        // Issue #798: Nightly Monte Carlo simulation runner
+        require('./jobs/nightlySimRunner').start();
 
 
 
