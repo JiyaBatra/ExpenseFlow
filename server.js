@@ -31,6 +31,7 @@ const backupService = require('./services/backupService');
 const twoFactorAuthRoutes = require('./routes/twoFactorAuth');
 const encryptionRoutes = require('./routes/encryption');
 const automatedForecastingRoutes = require('./routes/automatedForecasting');
+const auditComplianceRoutes = require('./routes/auditCompliance');
 const { transportSecuritySuite } = require('./middleware/transportSecurity');
 const cron = require('node-cron');
 
@@ -242,6 +243,7 @@ app.use('/api/accounts', require('./routes/accounts'));
 app.use('/api/2fa', require('./middleware/auth'), twoFactorAuthRoutes); // Issue #503: 2FA Management
 app.use('/api/encryption', encryptionRoutes); // Issue #827: End-to-End Encryption
 app.use('/api/forecasting-ai', automatedForecastingRoutes); // Issue #828: Automated Financial Forecasting & AI Insights
+app.use('/api/audit-compliance', auditComplianceRoutes); // Issue #829: Audit Trail & Forensic Investigation Platform
 
 // Express error handler middleware (must be after all routes)
 app.use((err, req, res, next) => {
