@@ -38,6 +38,7 @@ const apiGatewayRoutes = require('./routes/apiGateway');
 const realtimeCollaborationRoutes = require('./routes/realtimeCollaboration');
 const adaptiveRiskEngineRoutes = require('./routes/adaptiveRiskEngine');
 const attackGraphRoutes = require('./routes/attackGraph'); // Issue #848: Cross-Account Attack Graph Detection
+const incidentPlaybookRoutes = require('./routes/incidentPlaybooks'); // Issue #851: Autonomous Incident Response Playbooks
 const realtimeCollaborationService = require('./services/realtimeCollaborationService');
 const attackGraphIntegrationService = require('./services/attackGraphIntegrationService'); // Issue #848
 const { transportSecuritySuite } = require('./middleware/transportSecurity');
@@ -371,6 +372,7 @@ app.use('/api/gateway', apiGatewayRoutes);
 app.use('/api/realtime-collab', realtimeCollaborationRoutes);
 app.use('/api/risk-engine', adaptiveRiskEngineRoutes);
 app.use('/api/attack-graph', attackGraphRoutes); // Issue #848: Cross-Account Attack Graph Detection
+app.use('/api/incident-playbooks', incidentPlaybookRoutes); // Issue #851: Autonomous Incident Response Playbooks
 
 // Express error handler middleware (must be after all routes)
 app.use((err, req, res, next) => {
