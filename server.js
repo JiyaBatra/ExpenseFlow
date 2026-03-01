@@ -29,6 +29,8 @@ const groupsRoutes = require('./routes/groups');
 const backupRoutes = require('./routes/backups');
 const backupService = require('./services/backupService');
 const twoFactorAuthRoutes = require('./routes/twoFactorAuth');
+const encryptionRoutes = require('./routes/encryption');
+const { transportSecuritySuite } = require('./middleware/transportSecurity');
 const cron = require('node-cron');
 
 // Distributed real-time sync dependencies
@@ -52,6 +54,16 @@ const io = socketIo(server, {
 const PORT = process.env.PORT || 3000;
 
 // Security middleware
+// Transport Security (HTTPS, HSTS, Security Headers)
+// Issue #827: End-to-End Encryption for Sensitive Data
+app.use(transportSecuritySuite({
+  enforceHTTPS: process.env.NODE_ENV === 'production',
+  enforceHSTS: process.env.NODE_ENV === 'production',
+  securityHeaders: true,
+  enforceTLS: process.env.NODE_ENV === 'production',
+  validateCipher: process.env.NODE_ENV === 'production'
+}));
+
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -227,6 +239,7 @@ app.use('/api/tax', require('./routes/tax'));
 app.use('/api/backups', backupRoutes); // Issue #462: Backup Management API
 app.use('/api/accounts', require('./routes/accounts'));
 app.use('/api/2fa', require('./middleware/auth'), twoFactorAuthRoutes); // Issue #503: 2FA Management
+app.use('/api/encryption', encryptionRoutes); // Issue #827: End-to-End Encryption
 
 // Express error handler middleware (must be after all routes)
 app.use((err, req, res, next) => {
