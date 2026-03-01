@@ -13,7 +13,7 @@ const financialEventSchema = new mongoose.Schema({
     },
     entityType: {
         type: String,
-        enum: ['TRANSACTION', 'BUDGET', 'WORKSPACE', 'TREASURY_NODE'],
+        enum: ['TRANSACTION', 'BUDGET', 'WORKSPACE', 'TREASURY_NODE', 'TAX_OPTIMIZATION_NODE', 'PRIVACY_BRIDGE'],
         default: 'TRANSACTION'
     },
     eventType: {
@@ -28,7 +28,9 @@ const financialEventSchema = new mongoose.Schema({
             'FROZEN',
             'VIRTUAL_TRANSFER',
             'FUNDS_RESERVED',
-            'FUNDS_RELEASED'
+            'FUNDS_RELEASED',
+            'TAX_DEDUCTION_ESTIMATED',
+            'PRIVACY_AGGREGATE'
         ]
     },
     payload: {
@@ -86,5 +88,9 @@ const financialEventSchema = new mongoose.Schema({
 
 // Compound index for unique sequence per entity
 financialEventSchema.index({ entityId: 1, sequence: 1 }, { unique: true });
+
+// Issue #842: Optimized index for temporal sharding queries
+financialEventSchema.index({ entityId: 1, timestamp: 1, sequence: 1 });
+financialEventSchema.index({ workspaceId: 1, timestamp: 1 });
 
 module.exports = mongoose.model('FinancialEvent', financialEventSchema);

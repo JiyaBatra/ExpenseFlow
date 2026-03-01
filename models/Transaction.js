@@ -227,6 +227,12 @@ const transactionSchema = new mongoose.Schema({
         businessType: String,
         isRecurringInferred: { type: Boolean, default: false },
         indexedAt: Date
+    },
+    // NEW: Features for Differential Privacy Benchmarking
+    privacyMetadata: {
+        isBenchmarked: { type: Boolean, default: false },
+        lastBenchmarkedAt: Date,
+        privacyEpsilonConsumed: { type: Number, default: 0 }
     }
 }, {
     timestamps: true
