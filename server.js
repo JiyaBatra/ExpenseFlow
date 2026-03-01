@@ -28,6 +28,7 @@ const apiGatewayRoutes = require('./routes/apiGateway');
 const realtimeCollaborationRoutes = require('./routes/realtimeCollaboration');
 const adaptiveRiskEngineRoutes = require('./routes/adaptiveRiskEngine');
 const attackGraphRoutes = require('./routes/attackGraph'); // Issue #848: Cross-Account Attack Graph Detection
+const incidentPlaybookRoutes = require('./routes/incidentPlaybooks'); // Issue #851: Autonomous Incident Response Playbooks
 const realtimeCollaborationService = require('./services/realtimeCollaborationService');
 const attackGraphIntegrationService = require('./services/attackGraphIntegrationService'); // Issue #848
 const { transportSecuritySuite } = require('./middleware/transportSecurity');
@@ -80,6 +81,7 @@ const SERVER_INSTANCE_ID = process.env.SERVER_INSTANCE_ID || crypto.randomUUID()
 
 const app = express();
 const server = http.createServer(app);
+const io = socketIo(server);
 
 const { Server } = require('socket.io');
 const io = new Server(server, {
@@ -145,6 +147,8 @@ app.use(require('./middleware/encryptionInterceptor'));
 app.use(require('./middleware/validationInterceptor'));
 app.use(require('./middleware/auditInterceptor'));
 app.use(require('./middleware/auditTraceability'));
+app.use(require('./middleware/taxDeductionInterceptor')); // Issue #843
+app.use(require('./middleware/shardResolver')); // Issue #842: Distributed Ledger Fabric
 app.use(require('./middleware/tenantResolver'));
 // Inject Circuit Breaker protection early in the pipeline
 // We pass 'TRANSACTION' as a default, though specific routers might override it
@@ -244,6 +248,14 @@ io.on('connection', (socket) => {
       socket.emit('sync_error', { error: error.message });
     }
   });
+
+// Initialize Database
+connectDatabase();
+
+io.use(socketAuth);
+
+io.on('connection', (socket) => {
+  console.log(`User ${socket.user.name} connected to instance ${SERVER_INSTANCE_ID}`);
 
   // Listen for client expense changes and broadcast to Redis
   socket.on('expense_created', (expense) => {
@@ -427,6 +439,7 @@ app.use('/api/gateway', apiGatewayRoutes);
 app.use('/api/realtime-collab', realtimeCollaborationRoutes);
 app.use('/api/risk-engine', adaptiveRiskEngineRoutes);
 app.use('/api/attack-graph', attackGraphRoutes); // Issue #848: Cross-Account Attack Graph Detection
+app.use('/api/incident-playbooks', incidentPlaybookRoutes); // Issue #851: Autonomous Incident Response Playbooks
 
 // Express error handler middleware (must be after all routes)
 app.use((err, req, res, next) => {

@@ -17,7 +17,8 @@ class AuthService {
             id: user._id,
             jti: jwtId,
             role: user.role,
-            vaultAccess: true // Issue #770: Decryption permissions
+            vaultAccess: true, // Issue #770: Decryption permissions
+            benchmarkingEnabled: user.preferences?.allowBenchmarking || false // Issue #844
         };
 
         // If a specific workspace is selected, embed it in the token
