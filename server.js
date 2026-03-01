@@ -26,7 +26,9 @@ const auditComplianceRoutes = require('./routes/auditCompliance');
 const apiGatewayRoutes = require('./routes/apiGateway');
 const realtimeCollaborationRoutes = require('./routes/realtimeCollaboration');
 const adaptiveRiskEngineRoutes = require('./routes/adaptiveRiskEngine');
+const attackGraphRoutes = require('./routes/attackGraph'); // Issue #848: Cross-Account Attack Graph Detection
 const realtimeCollaborationService = require('./services/realtimeCollaborationService');
+const attackGraphIntegrationService = require('./services/attackGraphIntegrationService'); // Issue #848
 const { transportSecuritySuite } = require('./middleware/transportSecurity');
 const cron = require('node-cron');
 
@@ -166,10 +168,47 @@ async function connectDatabase() {
       }
     }
 
-  } catch (err) {
-    console.error('❌ MongoDB connection error:', err.message);
-  }
-}
+// Database connection
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => {
+    console.log('MongoDB connected');
+    // Initialize cron jobs after DB connection (includes backup scheduling)
+    // Issue #462: Automated Backup System for Financial Data
+    CronJobs.init();
+    console.log('✓ Cron jobs initialized (includes backup scheduling)');
+    
+    // Initialize attack graph detection system
+    // Issue #848: Cross-Account Attack Graph Detection
+    attackGraphIntegrationService.initialize();
+    console.log('✓ Attack graph detection initialized');
+  })
+  .catch(err => console.error('MongoDB connection error:', err));
+
+// Socket.IO authentication
+io.use(socketAuth);
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log(`User ${socket.user.name} connected`);
+
+  // Join user-specific room
+  socket.join(`user_${socket.userId}`);
+
+  // Handle sync requests
+  socket.on('sync_request', async (data) => {
+    try {
+      // Process sync queue for this user
+      const SyncQueue = require('./models/SyncQueue');
+      const pendingSync = await SyncQueue.find({
+        user: socket.userId,
+        processed: false
+      }).sort({ createdAt: 1 });
+
+      socket.emit('sync_data', pendingSync);
+    } catch (error) {
+      socket.emit('sync_error', { error: error.message });
+    }
+  });
 
   // Listen for client expense changes and broadcast to Redis
   socket.on('expense_created', (expense) => {
@@ -344,6 +383,7 @@ app.use('/api/audit-compliance', auditComplianceRoutes); // Issue #829: Audit Tr
 app.use('/api/gateway', apiGatewayRoutes);
 app.use('/api/realtime-collab', realtimeCollaborationRoutes);
 app.use('/api/risk-engine', adaptiveRiskEngineRoutes);
+app.use('/api/attack-graph', attackGraphRoutes); // Issue #848: Cross-Account Attack Graph Detection
 
 // Express error handler middleware (must be after all routes)
 app.use((err, req, res, next) => {
