@@ -154,6 +154,7 @@ async function connectDatabase() {
         require('./jobs/velocityCalculator').start();
         require('./jobs/keyRotator').start();
         require('./jobs/neuralReindexer').start(); // Issue #796: Semantic search re-indexer
+        require('./jobs/privacyAuditTrail').start(); // Issue #844: ZK privacy audit trail
 
 
 
@@ -210,114 +211,114 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Listen for client expense changes and broadcast to Redis
-  socket.on('expense_created', (expense) => {
-    io.emit('expense_created', expense);
-    redisPub.publish(SYNC_CHANNEL, JSON.stringify({ type: 'expense_created', expense }));
-  });
+// Listen for client expense changes and broadcast to Redis
+socket.on('expense_created', (expense) => {
+  io.emit('expense_created', expense);
+  redisPub.publish(SYNC_CHANNEL, JSON.stringify({ type: 'expense_created', expense }));
+});
 
-  socket.on('expense_updated', (expense) => {
-    io.emit('expense_updated', expense);
-    redisPub.publish(SYNC_CHANNEL, JSON.stringify({ type: 'expense_updated', expense }));
-  });
+socket.on('expense_updated', (expense) => {
+  io.emit('expense_updated', expense);
+  redisPub.publish(SYNC_CHANNEL, JSON.stringify({ type: 'expense_updated', expense }));
+});
 
-  socket.on('expense_deleted', (data) => {
-    io.emit('expense_deleted', data);
-    redisPub.publish(SYNC_CHANNEL, JSON.stringify({ type: 'expense_deleted', data }));
-  });
+socket.on('expense_deleted', (data) => {
+  io.emit('expense_deleted', data);
+  redisPub.publish(SYNC_CHANNEL, JSON.stringify({ type: 'expense_deleted', data }));
+});
 
-  socket.on('collab:join', async (payload = {}) => {
-    try {
-      const { documentId } = payload;
-      if (!documentId) {
-        socket.emit('collab:error', { error: 'documentId is required' });
-        return;
-      }
-
-      const snapshot = await realtimeCollaborationService.getDocument(documentId, socket.userId);
-      socket.join(`collab_doc_${documentId}`);
-      socket.emit('collab:snapshot', {
-        documentId,
-        snapshot
-      });
-
-      await realtimeCollaborationService.markPresence(documentId, socket.userId, true);
-
-      io.to(`collab_doc_${documentId}`).emit('collab:presence', {
-        documentId,
-        userId: socket.userId,
-        status: 'online',
-        timestamp: new Date().toISOString()
-      });
-    } catch (error) {
-      socket.emit('collab:error', { error: error.message });
+socket.on('collab:join', async (payload = {}) => {
+  try {
+    const { documentId } = payload;
+    if (!documentId) {
+      socket.emit('collab:error', { error: 'documentId is required' });
+      return;
     }
-  });
 
-  socket.on('collab:operations', async (payload = {}) => {
-    try {
-      const { documentId, operations = [], deviceId } = payload;
-      if (!documentId) {
-        socket.emit('collab:error', { error: 'documentId is required' });
-        return;
-      }
+    const snapshot = await realtimeCollaborationService.getDocument(documentId, socket.userId);
+    socket.join(`collab_doc_${documentId}`);
+    socket.emit('collab:snapshot', {
+      documentId,
+      snapshot
+    });
 
-      const result = await realtimeCollaborationService.applyOperations(
-        documentId,
-        socket.userId,
-        deviceId,
-        Array.isArray(operations) ? operations : []
-      );
+    await realtimeCollaborationService.markPresence(documentId, socket.userId, true);
 
-      socket.emit('collab:ack', {
-        documentId,
-        version: result.version,
-        appliedResults: result.appliedResults
-      });
+    io.to(`collab_doc_${documentId}`).emit('collab:presence', {
+      documentId,
+      userId: socket.userId,
+      status: 'online',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    socket.emit('collab:error', { error: error.message });
+  }
+});
 
-      const eventPayload = {
-        serverInstanceId: SERVER_INSTANCE_ID,
-        sourceSocketId: socket.id,
-        sourceUserId: socket.userId,
-        documentId,
-        version: result.version,
-        operations: result.serverOperations,
-        text: result.text,
-        registers: result.registers,
-        cells: result.cells,
-        timestamp: new Date().toISOString()
-      };
-
-      socket.to(`collab_doc_${documentId}`).emit('collab:operations', eventPayload);
-      redisPub.publish(COLLAB_CHANNEL, JSON.stringify(eventPayload));
-    } catch (error) {
-      socket.emit('collab:error', { error: error.message });
+socket.on('collab:operations', async (payload = {}) => {
+  try {
+    const { documentId, operations = [], deviceId } = payload;
+    if (!documentId) {
+      socket.emit('collab:error', { error: 'documentId is required' });
+      return;
     }
-  });
 
-  socket.on('collab:leave', async (payload = {}) => {
-    try {
-      const { documentId } = payload;
-      if (!documentId) {
-        return;
-      }
+    const result = await realtimeCollaborationService.applyOperations(
+      documentId,
+      socket.userId,
+      deviceId,
+      Array.isArray(operations) ? operations : []
+    );
 
-      socket.leave(`collab_doc_${documentId}`);
-      await realtimeCollaborationService.markPresence(documentId, socket.userId, false);
-      io.to(`collab_doc_${documentId}`).emit('collab:presence', {
-        documentId,
-        userId: socket.userId,
-        status: 'offline',
-        timestamp: new Date().toISOString()
-      });
-    } catch (error) {
-      socket.emit('collab:error', { error: error.message });
+    socket.emit('collab:ack', {
+      documentId,
+      version: result.version,
+      appliedResults: result.appliedResults
+    });
+
+    const eventPayload = {
+      serverInstanceId: SERVER_INSTANCE_ID,
+      sourceSocketId: socket.id,
+      sourceUserId: socket.userId,
+      documentId,
+      version: result.version,
+      operations: result.serverOperations,
+      text: result.text,
+      registers: result.registers,
+      cells: result.cells,
+      timestamp: new Date().toISOString()
+    };
+
+    socket.to(`collab_doc_${documentId}`).emit('collab:operations', eventPayload);
+    redisPub.publish(COLLAB_CHANNEL, JSON.stringify(eventPayload));
+  } catch (error) {
+    socket.emit('collab:error', { error: error.message });
+  }
+});
+
+socket.on('collab:leave', async (payload = {}) => {
+  try {
+    const { documentId } = payload;
+    if (!documentId) {
+      return;
     }
-  });
 
-  socket.on('disconnect', () => {
-    console.log(`User ${socket.user.name} disconnected`);
-  });
+    socket.leave(`collab_doc_${documentId}`);
+    await realtimeCollaborationService.markPresence(documentId, socket.userId, false);
+    io.to(`collab_doc_${documentId}`).emit('collab:presence', {
+      documentId,
+      userId: socket.userId,
+      status: 'offline',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    socket.emit('collab:error', { error: error.message });
+  }
+});
+
+socket.on('disconnect', () => {
+  console.log(`User ${socket.user.name} disconnected`);
+});
 });
 
 // Listen for Redis sync events and broadcast to local clients

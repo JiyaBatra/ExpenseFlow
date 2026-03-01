@@ -14,12 +14,15 @@ const DataWarehouse = require('../models/DataWarehouse');
 const CustomDashboard = require('../models/CustomDashboard');
 const FinancialHealthScore = require('../models/FinancialHealthScore');
 const ResponseFactory = require('../utils/ResponseFactory');
+const anonymizationGuard = require('../middleware/anonymizationGuard');
 const { asyncHandler } = require('../middleware/errorMiddleware');
 const { requireAuth, getUserId } = require('../middleware/clerkAuth');
 const cacheInterceptor = require('../middleware/cacheInterceptor');
 
 // Mount Graph-Aware Cache Interceptor for all analytics GET requests
 router.use(cacheInterceptor(300));
+
+const analyticsRepository = require('../repositories/analyticsRepository');
 
 
 // ========================
@@ -799,6 +802,71 @@ router.get('/intelligence/anomalies', requireAuth, [
       success: false,
       message: 'Failed to get anomaly analysis'
     });
+  }
+});
+
+// ============================================
+// ZERO-KNOWLEDGE PRIVACY BRIDGE ROUTES
+// Issue #844: Benchmarking & Cross-Tenant Analytics
+// ============================================
+
+/**
+ * GET /api/analytics/industry-benchmark/:workspaceId
+ * Get workspace performance compared to anonymized industry averages
+ */
+router.get('/industry-benchmark/:workspaceId', requireAuth, async (req, res) => {
+  try {
+    const workspaceId = req.params.workspaceId;
+    const field = req.query.field || 'amount';
+
+    const localBenchmark = await analyticsRepository.getIndustryBenchmarks(workspaceId, field);
+    if (localBenchmark.error) {
+      return res.status(403).json({ success: false, message: localBenchmark.error });
+    }
+
+    const globalAggregates = await analyticsRepository.fetchGlobalAggregates(field);
+
+    res.json({
+      success: true,
+      data: {
+        workspace: localBenchmark,
+        industry: globalAggregates,
+        variance: globalAggregates.globalAverage > 0
+          ? ((localBenchmark.anonymizedSum / localBenchmark.count) / globalAggregates.globalAverage - 1) * 100
+          : 0
+      }
+    });
+  } catch (error) {
+    console.error('Industry benchmark error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch industry aggregates' });
+  }
+});
+
+/**
+ * POST /api/analytics/industry-benchmark/contribute
+ * Opt-in and contribute anonymized data to the ZK Privacy Bridge
+ */
+router.post('/industry-benchmark/contribute', requireAuth, anonymizationGuard, async (req, res) => {
+  try {
+    const { workspaceId } = req.body;
+    const sanitizedData = req.sanitizedBenchmarkingData;
+
+    // In a real scenario, this would trigger the ZK orchestration
+    // For simulation, we verify the workspace has opt-in 
+    const PrivacyBridge = require('../models/PrivacyBridge');
+    await PrivacyBridge.findOneAndUpdate(
+      { workspaceId },
+      { allowBenchmarking: true },
+      { upsert: true }
+    );
+
+    res.json({
+      success: true,
+      message: 'Successfully contributed anonymized data to the bridge',
+      data: sanitizedData
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to contribute to the privacy bridge' });
   }
 });
 

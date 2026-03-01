@@ -152,18 +152,42 @@ class LedgerService {
     }
 
     /**
+     * Record a privacy-preserving aggregate event
+     * Issue #844: Validating aggregate integrity via the Merkle Chain
+     */
+    async recordPrivacyAggregateEvent(workspaceId, aggregateData) {
+        const payload = {
+            anonymizedSum: aggregateData.anonymizedSum,
+            count: aggregateData.count,
+            field: aggregateData.field,
+            method: 'DIFFERENTIAL_PRIVACY_NOISE',
+            timestamp: aggregateData.timestamp
+        };
+
+        return this.recordEvent(
+            new require('mongoose').Types.ObjectId(), // Virtual aggregate entity ID
+            'PRIVACY_AGGREGATE',
+            payload,
+            'SYSTEM',
+            workspaceId,
+            null,
+            'PRIVACY_BRIDGE'
+        );
+    }
+
+    /**
      * Calculate aggregated hash from multiple signatures
      */
     calculateAggregatedSignatureHash(signatures) {
         const crypto = require('crypto');
-        
+
         // Sort signatures by signer ID for deterministic ordering
-        const sorted = [...signatures].sort((a, b) => 
+        const sorted = [...signatures].sort((a, b) =>
             a.signerId.toString().localeCompare(b.signerId.toString())
         );
 
         // Create merkle root of signature hashes
-        let leaves = sorted.map(sig => 
+        let leaves = sorted.map(sig =>
             crypto.createHash('sha256').update(sig.signatureHash || '').digest('hex')
         );
 
@@ -187,7 +211,7 @@ class LedgerService {
      */
     async verifyMultiSigProof(eventId) {
         const event = await FinancialEvent.findById(eventId);
-        
+
         if (!event || !event.payload?.multiSigProof) {
             return { valid: false, reason: 'No multi-sig proof found' };
         }
