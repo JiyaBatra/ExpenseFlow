@@ -1,5 +1,7 @@
 const express = require('express');
 const http = require('http');
+const crypto = require('crypto');
+const socketIo = require('socket.io');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const socketAuth = require('./middleware/socketAuth');
@@ -22,6 +24,8 @@ const encryptionRoutes = require('./routes/encryption');
 const automatedForecastingRoutes = require('./routes/automatedForecasting');
 const auditComplianceRoutes = require('./routes/auditCompliance');
 const apiGatewayRoutes = require('./routes/apiGateway');
+const realtimeCollaborationRoutes = require('./routes/realtimeCollaboration');
+const realtimeCollaborationService = require('./services/realtimeCollaborationService');
 const { transportSecuritySuite } = require('./middleware/transportSecurity');
 const cron = require('node-cron');
 
@@ -32,6 +36,8 @@ const redisSub = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
 // Redis pub/sub channel for distributed sync
 const SYNC_CHANNEL = 'expenseflow:sync';
+const COLLAB_CHANNEL = 'expenseflow:collab';
+const SERVER_INSTANCE_ID = process.env.SERVER_INSTANCE_ID || crypto.randomUUID();
 
 const app = express();
 const server = http.createServer(app);
@@ -180,6 +186,95 @@ async function connectDatabase() {
     redisPub.publish(SYNC_CHANNEL, JSON.stringify({ type: 'expense_deleted', data }));
   });
 
+  socket.on('collab:join', async (payload = {}) => {
+    try {
+      const { documentId } = payload;
+      if (!documentId) {
+        socket.emit('collab:error', { error: 'documentId is required' });
+        return;
+      }
+
+      const snapshot = await realtimeCollaborationService.getDocument(documentId, socket.userId);
+      socket.join(`collab_doc_${documentId}`);
+      socket.emit('collab:snapshot', {
+        documentId,
+        snapshot
+      });
+
+      await realtimeCollaborationService.markPresence(documentId, socket.userId, true);
+
+      io.to(`collab_doc_${documentId}`).emit('collab:presence', {
+        documentId,
+        userId: socket.userId,
+        status: 'online',
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      socket.emit('collab:error', { error: error.message });
+    }
+  });
+
+  socket.on('collab:operations', async (payload = {}) => {
+    try {
+      const { documentId, operations = [], deviceId } = payload;
+      if (!documentId) {
+        socket.emit('collab:error', { error: 'documentId is required' });
+        return;
+      }
+
+      const result = await realtimeCollaborationService.applyOperations(
+        documentId,
+        socket.userId,
+        deviceId,
+        Array.isArray(operations) ? operations : []
+      );
+
+      socket.emit('collab:ack', {
+        documentId,
+        version: result.version,
+        appliedResults: result.appliedResults
+      });
+
+      const eventPayload = {
+        serverInstanceId: SERVER_INSTANCE_ID,
+        sourceSocketId: socket.id,
+        sourceUserId: socket.userId,
+        documentId,
+        version: result.version,
+        operations: result.serverOperations,
+        text: result.text,
+        registers: result.registers,
+        cells: result.cells,
+        timestamp: new Date().toISOString()
+      };
+
+      socket.to(`collab_doc_${documentId}`).emit('collab:operations', eventPayload);
+      redisPub.publish(COLLAB_CHANNEL, JSON.stringify(eventPayload));
+    } catch (error) {
+      socket.emit('collab:error', { error: error.message });
+    }
+  });
+
+  socket.on('collab:leave', async (payload = {}) => {
+    try {
+      const { documentId } = payload;
+      if (!documentId) {
+        return;
+      }
+
+      socket.leave(`collab_doc_${documentId}`);
+      await realtimeCollaborationService.markPresence(documentId, socket.userId, false);
+      io.to(`collab_doc_${documentId}`).emit('collab:presence', {
+        documentId,
+        userId: socket.userId,
+        status: 'offline',
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      socket.emit('collab:error', { error: error.message });
+    }
+  });
+
   socket.on('disconnect', () => {
     console.log(`User ${socket.user.name} disconnected`);
   });
@@ -190,10 +285,28 @@ redisSub.subscribe(SYNC_CHANNEL, (err) => {
   if (err) console.error('Redis subscribe error:', err);
 });
 
+redisSub.subscribe(COLLAB_CHANNEL, (err) => {
+  if (err) console.error('Redis collab subscribe error:', err);
+});
+
 redisSub.on('message', (channel, message) => {
-  if (channel !== SYNC_CHANNEL) return;
   try {
     const payload = JSON.parse(message);
+
+    if (channel === COLLAB_CHANNEL) {
+      if (payload.serverInstanceId === SERVER_INSTANCE_ID) {
+        return;
+      }
+      if (payload.documentId) {
+        io.to(`collab_doc_${payload.documentId}`).emit('collab:operations', payload);
+      }
+      return;
+    }
+
+    if (channel !== SYNC_CHANNEL) {
+      return;
+    }
+
     if (payload.type === 'expense_created') {
       io.emit('expense_created', payload.expense);
     } else if (payload.type === 'expense_updated') {
@@ -228,6 +341,7 @@ app.use('/api/encryption', encryptionRoutes); // Issue #827: End-to-End Encrypti
 app.use('/api/forecasting-ai', automatedForecastingRoutes); // Issue #828: Automated Financial Forecasting & AI Insights
 app.use('/api/audit-compliance', auditComplianceRoutes); // Issue #829: Audit Trail & Forensic Investigation Platform
 app.use('/api/gateway', apiGatewayRoutes);
+app.use('/api/realtime-collab', realtimeCollaborationRoutes);
 
 // Express error handler middleware (must be after all routes)
 app.use((err, req, res, next) => {
