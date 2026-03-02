@@ -30,8 +30,10 @@ const adaptiveRiskEngineRoutes = require('./routes/adaptiveRiskEngine');
 const attackGraphRoutes = require('./routes/attackGraph'); // Issue #848: Cross-Account Attack Graph Detection
 const incidentPlaybookRoutes = require('./routes/incidentPlaybooks'); // Issue #851: Autonomous Incident Response Playbooks
 const sessionTrustScoringRoutes = require('./routes/sessionTrustScoring'); // Issue #852: Continuous Session Trust Re-Scoring
+const mlAnomalyRoutes = require('./routes/mlAnomaly'); // Issue #878: Behavioral ML Anomaly Detection
 const realtimeCollaborationService = require('./services/realtimeCollaborationService');
 const attackGraphIntegrationService = require('./services/attackGraphIntegrationService'); // Issue #848
+const mlAnomalyDetectionService = require('./services/mlAnomalyDetectionService'); // Issue #878
 const { transportSecuritySuite } = require('./middleware/transportSecurity');
 const cron = require('node-cron');
 
@@ -214,15 +216,19 @@ async function connectDatabase() {
 
     attackGraphIntegrationService.initialize();
     console.log('✓ Attack graph detection initialized');
-
-  } catch (error) {
-    console.error('Database connection failed:', error.message);
-  }
-}
-
-connectDatabase();
-
-
+    
+    // Initialize ML anomaly detection system
+    // Issue #878: Behavioral ML Anomaly Detection
+    mlAnomalyDetectionService.initialize()
+      .then(() => {
+        console.log('✓ ML anomaly detection initialized');
+      })
+      .catch(err => {
+        console.error('ML anomaly detection initialization error:', err);
+        console.log('⚠ ML system will train on first use');
+      });
+  })
+  .catch(err => console.error('MongoDB connection error:', err));
 
 // Socket.IO authentication
 io.use(socketAuth);
@@ -431,6 +437,7 @@ app.use('/api/splits', require('./routes/splits'));
 app.use('/api/workspaces', require('./routes/workspaces'));
 app.use('/api/tax', require('./routes/tax'));
 app.use('/api/backups', backupRoutes); // Issue #462: Backup Management API
+app.use('/api/ml-anomaly', mlAnomalyRoutes); // Issue #878: Behavioral ML Anomaly Detection
 app.use('/api/accounts', require('./routes/accounts'));
 app.use('/api/2fa', require('./middleware/auth'), twoFactorAuthRoutes); // Issue #503: 2FA Management
 app.use('/api/encryption', encryptionRoutes); // Issue #827: End-to-End Encryption
